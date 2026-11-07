@@ -1,0 +1,9 @@
+{
+  "screens": [
+    { "name": "今日の5問", "click": ["#go-d"] },
+    { "name": "練習", "click": ["#go-p"] },
+    { "name": "むずかしい", "click": ["#go-p", ".lv button[data-t=\"2\"]"] },
+    { "name": "標識帳", "click": ["#go-dex"] },
+    { "name": "このゲームについて", "click": ["#f-about"] }
+  ]
+}
