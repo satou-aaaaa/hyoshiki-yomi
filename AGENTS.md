@@ -40,7 +40,7 @@ node qa/run.mjs   # 標識の名前と番号が標識令の別表どおりか・
 - 同じ日はどの端末でも同じ問題にする：乱数は `sort` の比較の中で引かない（QA が見る）。少し遅れて動く処理（setTimeout）は、画面が替わっていたら何もしない。
 - 一行に書いた処理の途中にコメント `//` を足さない（行の残りが消える）。
 - 機能を足す・直すたびに `qa/run.mjs` に検査を足す。乱数で組む部分は何百〜何千回も作って確かめる（shared-workflows `incidents/2026-10-31-roppo-empty-village.md`）。検査の期待値を乱数（練習・とことんの標識）の結果に頼らない（2026-11-07 実績の数を「3つ以上」で見て、練習の標識しだいで落ちた）。
-- PWA（`manifest.webmanifest`・`sw.js`・`icon-*.png`）：画面のファイルを足したら `sw.js` の `SHELL` にも足し、中身を大きく変えたら `CACHE` の版を上げる。アイコンは `node tools/make-icons.cjs`、SNS 用の絵 `og.png` は `node tools/make-og.cjs`（今日の問題を入れない）。
+- PWA（`manifest.webmanifest`・`sw.js`・`icon-*.png`）：画面のファイルを足したら `sw.js` の `SHELL` にも足し、中身を大きく変えたら `CACHE` の版を上げる。アイコンは `node tools/make-icons.cjs`、SNS 用の絵 `og.png` は `node tools/make-og.cjs`（今日の問題を入れない）。 `qa/sw-check.mjs` は shared-workflows `template/` の写し（本文の途中で通信が止まっても4秒で保存したものを返すか。ここでは直さない）。
 - 公開リポジトリなので、個人情報・鍵を入れない。
 
 ## 公開
