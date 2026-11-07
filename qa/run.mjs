@@ -233,7 +233,7 @@ try {
   }
   // 実績・このゲームについて
   await p.click("#back"); await p.click("#go-ach");
-  check("実績は13個で、腕前・集める・続けるの3つの組", await p.locator(".ach").count() === 13 && await p.locator(".agrp").count() === 3 && await p.locator(".ach.got").count() >= 3);
+  check("実績は13個で、腕前・集める・続けるの3つの組", await p.locator(".ach").count() === 13 && await p.locator(".agrp").count() === 3 && await p.locator('.ach.got[data-id="first"]').count() === 1 && await p.locator('.ach.got[data-id="hard1"]').count() === 1);
   check("達成した実績は ✓ の文字も付く（色だけで分けない）", (await p.textContent(".ach.got b")).startsWith("✓"));
   await p.click("#back"); await p.click("#f-about");
   check("このゲームについて：絵は簡単にかき直したもの・補助標識・出典", (await p.textContent("#about")).includes("簡単にかき直した") && (await p.textContent("#about")).includes("補助標識") && await p.locator("#about a").count() >= 2);
