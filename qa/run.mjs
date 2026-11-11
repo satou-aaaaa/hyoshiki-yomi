@@ -91,7 +91,7 @@ check("CSP で通信先を自分だけにしている", /connect-src 'self'/.tes
 check("Math.random は練習・とことんの種と並びだけ（今日の5問・上級は日付の乱数。gen.js には無い）", (html.match(/Math\.random/g) || []).length === 4 && !/Math\.random/.test(gen));
 check("乱数は sort の比較の中で引かない（ブラウザで引く回数が変わる）", !/\.sort\(\s*\([^)]*\)\s*=>[^\n;]*\b(R|rng|rand|Math\.random)\s*\(/.test(html + gen));
 check("一行の式の途中にコメント // を足さない（行の残りが消える。rosen-hitofude 2026-11-04）", !/;\s*\/\/[^\n]*;\s*\w/.test(gen.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n")));
-check("言い方：「このゲームについて」に、絵は簡単にかき直したもの・補助標識・運転免許の勉強の代わりではないこと・出典（e-Gov の標識令）がある", /簡単にかき直した/.test(html) && /補助標識/.test(html) && /運転免許の勉強/.test(html) && html.includes("https://laws.e-gov.go.jp/law/335M50004002003"));
+check("言い方：「このゲームについて」に、絵は簡単にかき直したもの・補助標識・運転免許の勉強の代わりではないこと・出典（e-Gov の標識令）がある", /簡単にかき直した/.test(html) && /補助標識/.test(html) && /運転免許の勉強/.test(html) && /const SRC = "https:\/\/laws\.e-gov\.go\.jp\/law\/335M50004002003";/.test(html));
 check("画面にお笑いの言葉を入れない（本物っぽく）", !/お笑い|ギャグ|ツッコミ|なんでやねん|（うそ）/.test(html + gen));
 check("引き継ぎ：transfer.js をゲームの script より前に、このゲームの記録のキーだけで読む", /<script src="transfer\.js" data-game="hyoshiki-yomi" data-keys="hyoshiki-v1,hyoshiki-fs"><\/script>\s*<\/head>/.test(html) && html.indexOf('src="transfer.js"') < html.indexOf('src="gen.js"') && /data-hk/.test(html) && existsSync(path.join(root, "transfer.js")));
 { const og = (k) => (html.match(new RegExp(`<meta (?:property|name)="${k}" content="([^"]+)"`)) || [])[1] || "";
@@ -105,8 +105,8 @@ check("README の URL のすぐ後ろに全角の字を続けない（Link check
   check("PWA：sw.js は本文の途中で通信が止まっても保存したものを返し、ふつうはネットの返事を返す（shared-workflows template/qa/sw-check.mjs）", st.ok, JSON.stringify(st)); }
 { const sw = readFileSync(path.join(root, "sw.js"), "utf8"), mf = JSON.parse(readFileSync(path.join(root, "manifest.webmanifest"), "utf8"));
   const shell = JSON.parse(sw.match(/SHELL = (\[[^\]]+\])/)[1]);
-  check("PWA：sw.js は画面のファイルを全部保存し（引き継ぎの transfer.js も）、外へ何も送らない", ["./index.html", "./gen.js", "./transfer.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"].every((f) => shell.includes(f)) && !/https?:\/\//.test(sw.replace(/^\/\/.*$/gm, "")));
-  check("PWA：manifest にアイコン2つと名前がある", mf.name === "標識よみ" && mf.icons.length >= 2 && mf.start_url === "./"); }
+  check("PWA：sw.js は画面のファイルを全部保存し（引き継ぎの transfer.js も）、外へ何も送らない", ["./index.html", "./gen.js", "./transfer.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"].every((f) => shell.includes(f)) && !/https?:\/\//.test(sw.replace(/^\/\/.*$/gm, "")));
+  check("PWA：manifest にアイコンと名前がある・maskable は別の絵（ふつうのアイコンを使い回さない）", mf.name === "標識よみ" && mf.icons.length >= 2 && mf.start_url === "./" && mf.icons.some((i) => i.purpose === "maskable" && i.src === "icon-maskable-512.png") && !mf.icons.some((i) => /maskable/.test(i.purpose || "") && mf.icons.some((k) => k !== i && k.src === i.src)) && existsSync(path.join(root, "icon-maskable-512.png"))); }
 
 // ---- 3. ブラウザで遊ぶ ----
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".png": "image/png", ".webmanifest": "application/manifest+json" };
@@ -151,6 +151,13 @@ try {
   check("文字の大きさ：「とても大きい」にすると開き直しても残る", await p.evaluate(() => getComputedStyle(document.documentElement).fontSize) === "25px" && await p.locator('.fsrow button[data-fs="3"][aria-pressed="true"]').count() === 1);
   await p.click('.fsrow button[data-fs="2"]');
   check("ホームに今日の見分け方が出る", (await p.textContent("#tip")).includes("今日の見分け方"));
+  check("ホームの題は h1{flex:1} を受け継いで縦に伸びない", await p.evaluate(() => getComputedStyle(document.querySelector("h1.title")).flexGrow) === "0");
+  // 保存に失敗したら、保存できるまで帯で知らせ続ける（shared-workflows routines/game-dev.md「記録の保存」。kippu-10 の検査を写した）
+  { const ps = p;
+    check("保存に失敗したら、保存できるまで知らせ続け、保存できたら消す", await ps.evaluate(async () => { const orig = Storage.prototype.setItem; Storage.prototype.setItem = function () { throw new Error("full"); }; save(() => {}); save(() => {}); const one = document.querySelectorAll("#savewarn").length === 1 && document.getElementById("savewarn").textContent.includes("保存できませんでした"); await new Promise((r) => setTimeout(r, 2500)); const stay = !!document.getElementById("savewarn"); Storage.prototype.setItem = orig; save(() => {}); return one && stay && !document.getElementById("savewarn"); }));
+    check("保存できない帯は画面のいちばん上に場所を取り（ボタンに重ならない）、読み上げの知らせにも出し、ほかの知らせのあとも警告が残る・保存できたら帯と警告が消え、ほかの知らせは残る", await ps.evaluate(async () => { const W = "保存できませんでした", tick = () => new Promise((r) => setTimeout(r, 50)); const orig = Storage.prototype.setItem; Storage.prototype.setItem = function () { throw new Error("full"); }; save(() => {}); const b = document.getElementById("savewarn"); const top = !!b && document.body.firstElementChild === b && getComputedStyle(b).position === "sticky"; const l = document.getElementById("live"); let live = true, kept = true, other = true; if (l) { live = l.textContent.includes(W); l.textContent = ""; await tick(); l.textContent = "べつの知らせ"; await tick(); kept = l.textContent.includes("べつの知らせ") && l.textContent.includes(W); } Storage.prototype.setItem = orig; save(() => {}); await tick(); if (l) other = l.textContent === "べつの知らせ"; return top && live && kept && other && !document.getElementById("savewarn"); }));
+    check("保存できない帯は、長い画面を下までスクロールしても画面の上に見えている（body の高さで止まらない）", await ps.evaluate(async () => { const orig = Storage.prototype.setItem; Storage.prototype.setItem = function () { throw new Error("full"); }; save(() => {}); const pad = document.createElement("div"); pad.style.height = "3000px"; document.body.appendChild(pad); scrollTo(0, document.documentElement.scrollHeight); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); const b = document.getElementById("savewarn"), r = b && b.getBoundingClientRect(); const ok = !!r && scrollY > 1000 && r.top >= -1 && r.top < 5; pad.remove(); scrollTo(0, 0); Storage.prototype.setItem = orig; save(() => {}); return ok && !document.getElementById("savewarn"); }));
+  }
 
   // 今日の5問：1問目はまちがえる、2問目はヒント2回、ほかはそのまま
   await p.click("#go-d");
@@ -170,15 +177,17 @@ try {
   check("問い方1（2問目）：意味の文と標識の絵4つ。絵の選び肢の名前は形と色だけで、意味を言わない", await p.locator("#q.board").count() === 1 && await p.locator(".pics .ch svg").count() === 4 && (await p.$$eval(".pics .ch", (b) => b.map((x) => x.getAttribute("aria-label") || ""))).every((l) => l.length > 4 && !G.SIGNS.some((x) => l.includes(x.m))) && (await p.$$eval(".pics .ch svg", (v) => v.every((x) => x.getAttribute("aria-hidden") === "true"))));
   check("ヒント1は標識の種類（形と色のきまり）を言い、答えは言わない", (await p.textContent("#hintbox")).includes("💡") && /標識/.test(await p.textContent("#hintbox")) && await p.locator(".ch.ng").count() === 0);
   await p.click("#hint");
-  check("ヒント2はまちがいの選び肢を消し、2つにしぼる・ヒントは2回まで", await p.locator(".ch.ng").count() === 2 && await p.locator("#hint:disabled").count() === 1);
+  check("ヒント2はまちがいの選び肢を消し、2つにしぼる・ヒントは2回まで", await p.locator(".ch.ng").count() === 2 && await p.locator("#hint:disabled").count() === 1 && (await p.textContent("#hintbox")).includes("のこりは2つ"));
+  { const a = await ansIdx(p); const j = await p.$$eval(".ch", (bs, a) => bs.findIndex((b, i) => i !== a && !b.disabled), a); await p.click(`.ch[data-j="${j}"]`); }
+  check("ヒント2のあとに残ったまちがいを選ぶと、消した選び肢は戻らず正解だけが残る・のこりの数もいま押せる数", await p.locator(".ch:not([disabled])").count() === 1 && (await p.textContent("#hintbox")).includes("のこりは1つ"));
   await solve(p);
-  check("ヒント2回は★1", (await p.getAttribute(".verdict .stars", "aria-label")) === "星1つ");
+  check("ヒント2回は★1・星は role=img で、取れなかった星は ☆（色だけで分けない）", (await p.getAttribute(".verdict .stars", "aria-label")) === "星1つ" && (await p.getAttribute(".verdict .stars", "role")) === "img" && (await p.textContent(".verdict .stars .off")) === "☆☆");
   await p.click("#next");
   check("ふつう（3問目）：問い方0で、答えはよく見る・ときどき見る標識", await p.locator("#q svg.sign").count() === 1 && G.poolOf(1).includes(await p.evaluate(() => __kk.cur().P.ans)));
   for (let i = 2; i < 5; i++) { if (i === 4) check("むずかしい（5問目）：まぎらわしいなかまの選び肢がある", await p.evaluate(() => { const P = __kk.cur().P, S = __kk.G.SBY; return P.opts.some((o) => o !== P.ans && S[o].g === S[P.ans].g); })); await solve(p); await p.click("#next"); }
   await p.waitForTimeout(150);
   const s1 = await mem(p);
-  check("5問で結果：今日の記録に1問ごとのまちがい（1・2・0・0・0）", JSON.stringify(s1.days[TODAY]?.m) === "[1,2,0,0,0]");
+  check("5問で結果：今日の記録に1問ごとのまちがい（1・3・0・0・0。2問目はヒント2回のあとにもう1回まちがえた）", JSON.stringify(s1.days[TODAY]?.m) === "[1,3,0,0,0]");
   const share = await p.textContent(".share");
   check("シェアの文に答え・問題を出さない（印だけ）", /第\d+回/.test(share) && /🟢/.test(share) && !G.SIGNS.some((x) => share.includes(x.n) || share.includes(x.m)) && !/標識令|警戒|規制|指示/.test(share), share);
   check("まちがいのある日は Ko-fi の一言を出さない", await p.locator(".kofi").count() === 0);
@@ -213,8 +222,8 @@ try {
   check("まちがえてもヒントを使っても続く", await p.evaluate(() => __kk.cur().i) === 4 && await p.locator("#quit").count() === 1);
   await p.reload(); await p.waitForTimeout(200); await p.click("#go-e");
   check("とことんは開き直しても続きから", await p.evaluate(() => __kk.cur().i) === 4);
-  await p.click("#quit"); await p.waitForTimeout(150);
-  check("「ここで降りる」で終わり、一発で解いた数（2問）が自己ベストに残る", (await mem(p)).ebest === 2 && (await p.textContent("#eres")).includes("4問") && (await p.textContent("#ebest")).includes("一発で読めた標識 2問") && !(await mem(p)).runs.e);
+  await solve(p); await p.click("#quit"); await p.waitForTimeout(150);
+  check("正解した直後でも「ここで降りる」で終わり、一発で解いた数（3問）が自己ベストに残る", (await mem(p)).ebest === 3 && (await p.textContent("#eres")).includes("5問") && (await p.textContent("#ebest")).includes("一発で読めた標識 3問") && !(await mem(p)).runs.e);
   {
     // とことんの並びを使い切りそうになったら、次の並びを足して続ける（好きなだけ遊べる）
     await p.evaluate(() => { __kk.save((s) => { s.runs.e = { mode: "e", id: "zz", date: __kk.todayKey(), list: __kk.endlessList().slice(0, 6), res: [{ m: 0 }, { m: 0 }], cur: null, clean: 2, miss: 0 }; }); });
