@@ -355,6 +355,16 @@ try {
   const sample = { "hyoshiki-v1": JSON.stringify({ v: 1, tut: true, days: { "2026-11-07": { m: [0, 1, 0, 0, 2], k: ["e0", "e1", "n0", "n1", "h0"] } }, hdays: {}, adays: {}, dex: { e0: 1, e1: 1, n0: 1, n1: 1, h0: 1 }, sg: { "330": 1, "316": 1, "201c": 1, "405": 1, "204": 1 }, runs: {}, kofi: {}, ach: {}, ebest: 7, t: 1 }), "hyoshiki-fs": "3" };
   await checkTransfer({ browser, url, game: "hyoshiki-yomi", sample, check, open: async (pg) => { if (await pg.locator("#howto[open]").count()) await pg.click("#howto-ok"); } });
 } catch (e) { check("引き継ぎの検査が最後まで動く", false, e.message.split("\n")[0]); }
+// 知らせ（.toast）が出ているあいだも、その下のボタンを押せる（2026-11-17。知らせがボタンをふさがないように）
+{
+  const ct = await browser.newContext({ viewport: { width: 390, height: 800 } });
+  const pt = await ct.newPage(); await pt.goto(url); await pt.waitForTimeout(300);
+  const at = await pt.evaluate(() => { const d = document.getElementById("howto"); if (d && d.open && d.close) d.close(); toast("おしらせの検査"); const t = [...document.querySelectorAll(".toast")].pop(), r = t.getBoundingClientRect(), b = document.createElement("button"); b.id = "qa-under"; b.textContent = "下"; b.style.cssText = "position:fixed;left:0;bottom:0;width:100%;height:" + (innerHeight - r.top + 10) + "px;z-index:1"; b.onclick = () => { b.dataset.hit = "1"; }; document.body.appendChild(b); return { x: r.left + r.width / 2, y: r.top + r.height / 2, pe: getComputedStyle(t).pointerEvents }; });
+  await pt.mouse.click(at.x, at.y); await pt.waitForTimeout(50);
+  const hit = await pt.evaluate(() => { const b = document.getElementById("qa-under"), on = !!document.querySelector(".toast"), h = b.dataset.hit === "1"; b.remove(); return on && h; });
+  check("知らせ（.toast）が出ているあいだも、その下のボタンを押せる（pointer-events:none）", at.pe === "none" && hit, JSON.stringify(at));
+  await ct.close();
+}
 await browser.close();
 server.close();
 check("画面のエラーが無い", errors.length === 0, errors.slice(0, 3).join(" | "));
