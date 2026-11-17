@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { checkTransfer } from "./transfer-check.mjs";
 import { checkSwStall } from "./sw-check.mjs";
+import { checkDepth } from "./depth-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const results = [];
@@ -93,7 +94,7 @@ check("乱数は sort の比較の中で引かない（ブラウザで引く回�
 check("一行の式の途中にコメント // を足さない（行の残りが消える。rosen-hitofude 2026-11-04）", !/;\s*\/\/[^\n]*;\s*\w/.test(gen.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n")));
 check("言い方：「このゲームについて」に、絵は簡単にかき直したもの・補助標識・運転免許の勉強の代わりではないこと・出典（e-Gov の標識令）がある", /簡単にかき直した/.test(html) && /補助標識/.test(html) && /運転免許の勉強/.test(html) && /const SRC = "https:\/\/laws\.e-gov\.go\.jp\/law\/335M50004002003";/.test(html));
 check("画面にお笑いの言葉を入れない（本物っぽく）", !/お笑い|ギャグ|ツッコミ|なんでやねん|（うそ）/.test(html + gen));
-check("引き継ぎ：transfer.js をゲームの script より前に、このゲームの記録のキーだけで読む", /<script src="transfer\.js" data-game="hyoshiki-yomi" data-keys="hyoshiki-v1,hyoshiki-fs"><\/script>\s*<\/head>/.test(html) && html.indexOf('src="transfer.js"') < html.indexOf('src="gen.js"') && /data-hk/.test(html) && existsSync(path.join(root, "transfer.js")));
+check("引き継ぎ：transfer.js をゲームの script より前に、このゲームの記録のキー（記録・文字・復習）だけで読む・depth.js も前に読む", /<script src="transfer\.js" data-game="hyoshiki-yomi" data-keys="hyoshiki-v1,hyoshiki-fs,hyoshiki-depth"><\/script>\s*<script src="depth\.js" data-game="hyoshiki-yomi" data-key="hyoshiki-depth"><\/script>\s*<\/head>/.test(html) && html.indexOf('src="transfer.js"') < html.indexOf('src="gen.js"') && html.indexOf('src="depth.js"') < html.indexOf('src="gen.js"') && /data-hk/.test(html) && existsSync(path.join(root, "transfer.js")));
 { const og = (k) => (html.match(new RegExp(`<meta (?:property|name)="${k}" content="([^"]+)"`)) || [])[1] || "";
   const png = readFileSync(path.join(root, "og.png"));
   check("SNS で貼ると絵と題が出る（OGP・1200×630・絶対URL）", og("og:title") && og("og:description") && og("og:image") === "https://satou-aaaaa.github.io/hyoshiki-yomi/og.png" && og("twitter:card") === "summary_large_image" && png.readUInt32BE(16) === 1200 && png.readUInt32BE(20) === 630); }
@@ -105,7 +106,7 @@ check("README の URL のすぐ後ろに全角の字を続けない（Link check
   check("PWA：sw.js は本文の途中で通信が止まっても保存したものを返し、ふつうはネットの返事を返す（shared-workflows template/qa/sw-check.mjs）", st.ok, JSON.stringify(st)); }
 { const sw = readFileSync(path.join(root, "sw.js"), "utf8"), mf = JSON.parse(readFileSync(path.join(root, "manifest.webmanifest"), "utf8"));
   const shell = JSON.parse(sw.match(/SHELL = (\[[^\]]+\])/)[1]);
-  check("PWA：sw.js は画面のファイルを全部保存し（引き継ぎの transfer.js も）、外へ何も送らない", ["./index.html", "./gen.js", "./transfer.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"].every((f) => shell.includes(f)) && !/https?:\/\//.test(sw.replace(/^\/\/.*$/gm, "")));
+  check("PWA：sw.js は画面のファイルを全部保存し（引き継ぎの transfer.js・深さの depth.js も）、外へ何も送らない", ["./index.html", "./gen.js", "./transfer.js", "./depth.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"].every((f) => shell.includes(f)) && !/https?:\/\//.test(sw.replace(/^\/\/.*$/gm, "")));
   check("PWA：manifest にアイコンと名前がある・maskable は別の絵（ふつうのアイコンを使い回さない）", mf.name === "標識よみ" && mf.icons.length >= 2 && mf.start_url === "./" && mf.icons.some((i) => i.purpose === "maskable" && i.src === "icon-maskable-512.png") && !mf.icons.some((i) => /maskable/.test(i.purpose || "") && mf.icons.some((k) => k !== i && k.src === i.src)) && existsSync(path.join(root, "icon-maskable-512.png"))); }
 
 // ---- 3. ブラウザで遊ぶ ----
@@ -245,7 +246,7 @@ try {
   }
   // 実績・このゲームについて
   await p.click("#back"); await p.click("#go-ach");
-  check("実績は13個で、腕前・集める・続けるの3つの組", await p.locator(".ach").count() === 13 && await p.locator(".agrp").count() === 3 && await p.locator('.ach.got[data-id="first"]').count() === 1 && await p.locator('.ach.got[data-id="hard1"]').count() === 1);
+  check("実績は15個で、腕前・集める・続けるの3つの組", await p.locator(".ach").count() === 15 && await p.locator(".agrp").count() === 3 && await p.locator('.ach.got[data-id="first"]').count() === 1 && await p.locator('.ach.got[data-id="hard1"]').count() === 1);
   check("達成した実績は ✓ の文字も付く（色だけで分けない）", (await p.textContent(".ach.got b")).startsWith("✓"));
   await p.click("#back"); await p.click("#f-about");
   check("このゲームについて：絵は簡単にかき直したもの・補助標識・出典", (await p.textContent("#about")).includes("簡単にかき直した") && (await p.textContent("#about")).includes("補助標識") && await p.locator("#about a").count() >= 2);
@@ -348,11 +349,78 @@ try {
     check("キーボードだけで選んで答えられる", await q.locator(".verdict").count() === 1);
     await q.context().close();
   }
+  // 1問を深くする：自信をかける・復習（shared-workflows routines/game-dev.md「1問を深くする」・depth.js）
+  {
+    const DK = "hyoshiki-depth", dpOf = (q) => q.evaluate((k) => JSON.parse(localStorage.getItem(k) || "{}"), DK);
+    const setRv = (q, rv, only) => q.evaluate(([k, rv, only]) => { const d = JSON.parse(localStorage.getItem(k) || '{"v":1}'); d.rv = only ? rv : Object.assign(d.rv || {}, rv); localStorage.setItem(k, JSON.stringify(d)); }, [DK, rv, only]);
+    const dayAfter = (n) => new Date(Date.parse(TODAY) + n * 864e5).toISOString().slice(0, 10);
+    const q = await newPage(); await closeHow(q);
+    await q.click("#go-d"); await q.waitForTimeout(100);
+    const sb = await q.$eval("#dp-sure", (b) => [b.getBoundingClientRect().height, b.getAttribute("aria-pressed"), b.textContent]);
+    check("問題の画面に「🎯 自信あり？」のボタン（高さ44px以上・押す前は ✓ なし）", Math.round(sb[0]) >= 44 && sb[1] === "false" && !sb[2].includes("✓"), String(sb[0]));
+    await q.click("#dp-sure");
+    check("自信のボタンを押すと ✓ が出る（色だけで分けない）", (await q.getAttribute("#dp-sure", "aria-pressed")) === "true" && (await q.textContent("#dp-sure")).includes("✓"));
+    const t1 = await q.evaluate(() => __kk.cur().tag);
+    await q.click(`.ch[data-j="${await wrongIdx(q)}"]`); await q.waitForTimeout(100);
+    check("自信ありでまちがえると、知らせに「思いこみ」と出て、自信は変えられない", (await q.textContent("#msg")).includes("思いこみ") && (await q.locator("#dp-sure:disabled").count()) === 1);
+    check("まちがえたその時に復習へ入る（解き終えずにやめても残る）", !!((await dpOf(q)).rv || {})[t1]);
+    await q.click(`.ch[data-j="${await ansIdx(q)}"]`); await q.waitForSelector(".verdict");
+    check("正解の説明に「自信ありでまちがえた」と出る", (await q.textContent(".verdict")).includes("自信ありでまちがえた"));
+    await q.click("#next");
+    check("次の問題には自信のボタンが出直す", (await q.locator("#dp-sure").count()) === 1);
+    for (let i = 1; i < 5; i++) { await solve(q); await q.click("#next"); }
+    await q.waitForTimeout(100);
+    check("終えた直後の結果に「自信ありの当たり 0/1」が出る", (await q.locator("#surestat").count()) === 1 && (await q.textContent("#surestat")).includes("0/1"));
+    let dp = await dpOf(q);
+    check("まちがえた・ヒントを使った問題だけ復習に入る・自信は1回だけ数える", Object.keys(dp.rv || {}).join() === t1 && dp.sure === 1 && dp.sureOk === 0, Object.keys(dp.rv || {}).join() + " sure=" + dp.sure);
+    const before = JSON.stringify((await mem(q)).days);
+    await q.goto(url); await q.waitForTimeout(150);
+    check("日の来ていない復習は、ホームに出ない", (await q.locator("#go-r").count()) === 0);
+    await setRv(q, { [t1]: { s: 0, due: "2026-01-01", t: 1 } });
+    await q.goto(url); await q.waitForTimeout(150);
+    check("日を進めると（日の来た復習があると）、ホームに「復習 1問」", ((await q.locator("#go-r").count()) ? await q.textContent("#go-r") : "").includes("復習 1問"));
+    await q.click("#go-r"); await q.waitForTimeout(100);
+    check("復習の画面は「復習」と出る・同じ問題", (await q.textContent("header")).includes("復習") && await q.evaluate(() => __kk.cur().tag) === t1);
+    await q.click("#dp-sure"); await solve(q);
+    check("自信ありで正解すると「自信ありで当てた」", (await q.textContent(".verdict")).includes("自信ありで当てた"));
+    await q.click("#next"); await q.waitForTimeout(100);
+    dp = await dpOf(q);
+    check("復習を終えると結果は「復習」・今日の記録は増えない・シェアは出ない", (await q.textContent("h1")).includes("復習") && JSON.stringify((await mem(q)).days) === before && (await q.locator("#share").count()) === 0);
+    check("復習で一度で正解すると、次は3日後へ進む", dp.rv[t1] && dp.rv[t1].s === 1 && dp.rv[t1].due === dayAfter(3) && dp.sureOk === 1);
+    await q.goto(url); await q.waitForTimeout(150);
+    check("復習を終えたら、ホームの「復習」は消える", (await q.locator("#go-r").count()) === 0);
+    await setRv(q, { "nai|1|330": { s: 0, due: "2026-01-01", t: 2 }, "constructor|x": { s: 0, due: "2026-01-01", t: 3 } });
+    await q.goto(url); await q.waitForTimeout(150);
+    check("作り直せない鍵（無い種類・constructor）は復習に数えず、ホームも出る", (await q.locator("#go-d").count()) === 1 && (await q.locator("#go-r").count()) === 0);
+    // 復習の途中でヒントを使って日の来た問題が0になっても、ホームの「復習の続きから」で戻れる
+    await setRv(q, { [t1]: { s: 0, due: "2026-01-01", t: 9 } }, true);
+    await q.goto(url); await q.waitForTimeout(150); await q.click("#go-r"); await q.click("#hint"); await q.waitForTimeout(100);
+    check("復習の途中でヒントを使うと、その時に1日後へ戻る", (await dpOf(q)).rv[t1].due === dayAfter(1));
+    await q.goto(url); await q.waitForTimeout(150);
+    check("復習の途中で日の来た問題が0になっても、ホームの「復習の続きから」で戻れる", ((await q.locator("#go-r").count()) ? await q.textContent("#go-r") : "").includes("続きから"));
+    await q.click("#go-r"); await q.waitForTimeout(100);
+    check("復習の続きは同じ問題・使ったヒントはそのまま", await q.evaluate(() => __kk.cur().tag) === t1 && await q.evaluate(() => __kk.cur().hints) === 1);
+    // 別のタブで先に進んだ古い画面でヒントを押しても、復習の段は戻らない
+    await q.evaluate((t) => { __kk.save((s) => { s.runs.r.res.push({ m: 0 }); s.runs.r.cur = null; }); const d = JSON.parse(localStorage.getItem("hyoshiki-depth")); d.rv[t] = { s: 2, due: "2099-01-01", t: 99 }; localStorage.setItem("hyoshiki-depth", JSON.stringify(d)); }, t1);
+    await q.click("#hint"); await q.waitForTimeout(100);
+    check("別のタブで先に進んだ古い画面でヒントを押しても、復習の段は戻らない", (await dpOf(q)).rv[t1].s === 2);
+    const m2 = await mem(q);
+    check("復習はカレンダー・あとから・連続の記録に入らない", Object.keys(m2.days).length === 1 && Object.keys(m2.adays).length === 0);
+    // とことんでまちがえてから「ここで降りる」と、解き終えていない問題も復習に入る
+    await q.evaluate(() => { __kk.save((s) => { s.runs.r = null; }); localStorage.setItem("hyoshiki-depth", '{"v":1}'); });
+    await q.goto(url); await q.waitForTimeout(150); await q.click("#go-e"); await q.waitForTimeout(100);
+    const te = await q.evaluate(() => __kk.cur().tag);
+    await q.click(`.ch[data-j="${await wrongIdx(q)}"]`); await q.waitForTimeout(100); await q.click("#quit"); await q.waitForTimeout(100);
+    check("とことんでまちがえてから降りても、その問題は復習に入る", !!((await dpOf(q)).rv || {})[te]);
+    await q.context().close();
+  }
 } catch (e) { check("ブラウザでの検査が最後まで動く", false, e.stack.split("\n").slice(0, 3).join(" ")); }
 
+// 深さの部品（shared-workflows template/qa/depth-check.mjs）
+{ const e = await checkDepth(readFileSync(path.join(root, "depth.js"), "utf8")); check("depth.js（自信をかける・復習）の動き", e.length === 0, e.join(" / ")); }
 // 引き継ぎコード（shared-workflows template/qa/transfer-check.mjs）
 try {
-  const sample = { "hyoshiki-v1": JSON.stringify({ v: 1, tut: true, days: { "2026-11-07": { m: [0, 1, 0, 0, 2], k: ["e0", "e1", "n0", "n1", "h0"] } }, hdays: {}, adays: {}, dex: { e0: 1, e1: 1, n0: 1, n1: 1, h0: 1 }, sg: { "330": 1, "316": 1, "201c": 1, "405": 1, "204": 1 }, runs: {}, kofi: {}, ach: {}, ebest: 7, t: 1 }), "hyoshiki-fs": "3" };
+  const sample = { "hyoshiki-v1": JSON.stringify({ v: 1, tut: true, days: { "2026-11-07": { m: [0, 1, 0, 0, 2], k: ["e0", "e1", "n0", "n1", "h0"] } }, hdays: {}, adays: {}, dex: { e0: 1, e1: 1, n0: 1, n1: 1, h0: 1 }, sg: { "330": 1, "316": 1, "201c": 1, "405": 1, "204": 1 }, runs: {}, kofi: {}, ach: {}, ebest: 7, t: 1 }), "hyoshiki-fs": "3", "hyoshiki-depth": JSON.stringify({ v: 1, rv: { "e0|x1": { s: 1, due: "2026-11-20", t: 5 } } }) }; // 復習の記録も引き継ぐかを見る
   await checkTransfer({ browser, url, game: "hyoshiki-yomi", sample, check, open: async (pg) => { if (await pg.locator("#howto[open]").count()) await pg.click("#howto-ok"); } });
 } catch (e) { check("引き継ぎの検査が最後まで動く", false, e.message.split("\n")[0]); }
 // 知らせ（.toast）が出ているあいだも、その下のボタンを押せる（2026-11-17。知らせがボタンをふさがないように）
